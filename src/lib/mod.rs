@@ -11,13 +11,13 @@ pub struct GitRepository {
 fn default_config() -> Ini {
     let mut config = Ini::new();
     config.set("core", "repositoryformatversion", Some("0".to_owned()));
-    config.set("core", "filemode", Some("fasle".to_owned()));
+    config.set("core", "filemode", Some("false".to_owned()));
     config.set("core", "bare", Some("false".to_owned()));
     config
 }
 
 impl GitRepository {
-    fn init(path: &str) -> Result<GitRepository, std::io::Error> {
+    pub fn init(path: &str) -> Result<GitRepository, std::io::Error> {
         let path = PathBuf::from(path);
         let git_dir = path.join(".git");
         if git_dir.exists() {

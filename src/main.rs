@@ -1,4 +1,5 @@
 pub mod lib;
+use lib::*;
 use clap::{App, Arg, SubCommand};
 
 fn make_parser() -> App<'static, 'static> {
@@ -20,6 +21,20 @@ fn make_parser() -> App<'static, 'static> {
 
 fn main() {
     let matches = make_parser().get_matches();
+    if matches.is_present("init") {
+        let sub_matches = matches.subcommand_matches("init").unwrap();
+        if let Some(path) = sub_matches.value_of("path") {
+            match GitRepository::init(path) {
+                Ok(_) => (),
+                Err(err) => println!("Error initializing {}", err),
+            }
+        } else {
+            println!("No value given for path")
+        }
+    }
+    else {
+        println!("not  a valid command")
+    }
 }
 
 #[cfg(test)]
