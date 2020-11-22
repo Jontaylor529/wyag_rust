@@ -8,8 +8,33 @@ pub struct GitRepository {
     config: Ini,
 }
 
+fn default_config() -> Ini {
+    let mut config = Ini::new();
+    config.set("core", "repositoryformatversion", Some("0".to_owned()));
+    config
+}
+
 impl GitRepository {
-    fn try_init(path: &str, force: bool) -> Result<GitRepository, &str> {
+    fn init(path: &str) -> Result<GitRepository, std::io::Error> {
+        let path = PathBuf::from(path);
+        let git_dir = path.join(".git");
+        if git_dir.exists() {
+            Err(std::io::Error::new(
+                ErrorKind::AlreadyExists,
+                "Already a git repo",
+            ))
+        } else {
+            std::fs::create_dir_all(&git_dir)?;
+            let config = default_config();
+            config.write(git_dir.join("config").to_str().unwrap());
+            match GitRepository::at_path(path.to_str().unwrap(), false) {
+                Ok(repo) => Ok(repo),
+                Err(msg) => Err(std::io::Error::new(ErrorKind::Other, msg)),
+            }
+        }
+    }
+
+    fn at_path(path: &str, force: bool) -> Result<GitRepository, &str> {
         let worktree = PathBuf::from(path);
         let gitdir = worktree.join(".git");
         let mut config = Ini::new();
@@ -87,8 +112,8 @@ impl GitRepository {
 mod tests {
     use super::*;
 
-    fn init_test_repo() -> GitRepository {
-        let worktree = get_test_dir();
+    fn init_test_repo(temp_dir:&str) -> GitRepository {
+        let worktree = get_test_dir(temp_dir);
         let gitdir = worktree.join(".git");
         let config = Ini::new();
         GitRepository {
@@ -98,25 +123,25 @@ mod tests {
         }
     }
 
-    fn get_test_dir() -> PathBuf {
-        PathBuf::from("C:\\users\\gameo\\appdata\\local\\temp")
+    fn get_test_dir(sub_dir:&str) -> PathBuf {
+        ["C:\\","users","gameo","appdata","local","temp","testing",sub_dir].iter().collect::<PathBuf>()
     }
 
     #[test]
     fn create_repo_path() {
-        let test_repo = init_test_repo();
+        let test_repo = init_test_repo("create_repo_path");
         let rel_head: PathBuf = ["refs", "head"].iter().collect();
         let head = test_repo.repo_path(&rel_head);
-        let res_path = get_test_dir().join([".git", "refs", "head"].iter().collect::<PathBuf>());
+        let res_path = get_test_dir("create_repo_path").join([".git", "refs", "head"].iter().collect::<PathBuf>());
         assert!(head == res_path, "was {}", head.to_string_lossy());
     }
 
     #[test]
     fn create_repo_dir() {
         //setup
-        let test_repo = init_test_repo();
+        let test_repo = init_test_repo("create_repo_dir");
         let rel_path: PathBuf = ["refs", "head"].iter().collect();
-        let res_dir = get_test_dir().join([".git", "refs", "head"].iter().collect::<PathBuf>());
+        let res_dir = get_test_dir("create_repo_dir").join([".git", "refs", "head"].iter().collect::<PathBuf>());
         //clean
         if Path::exists(&res_dir) {
             std::fs::remove_dir_all(&res_dir).expect("unable to clean directory");
@@ -132,9 +157,9 @@ mod tests {
 
     #[test]
     fn create_repo_file() {
-        let test_repo = init_test_repo();
+        let test_repo = init_test_repo("create_repo_file");
         let rel_path = ["objects", "tags", "test"].iter().collect::<PathBuf>();
-        let res_file = get_test_dir().join(PathBuf::from(".git").join(&rel_path));
+        let res_file = get_test_dir("create_repo_file").join(PathBuf::from(".git").join(&rel_path));
 
         if res_file.exists() {
             std::fs::remove_file(&res_file).expect("unable to clean directory");
@@ -153,5 +178,16 @@ mod tests {
             res_file.to_string_lossy()
         );
         assert!(repo_file.exists());
+    }
+
+    #[test]
+    fn create_default_repo() {
+        let test_dir = get_test_dir("create_default_repo");
+        if test_dir.join(".git").exists() {
+            std::fs::remove_dir_all(&test_dir.join(".git")).expect("Error cleaning directory");
+        }
+        let repo = GitRepository::init(test_dir.to_str().unwrap()).expect("Error creating repo");
+        assert!(repo.worktree == test_dir);
+        assert!(test_dir.join(".git").exists());
     }
 }
