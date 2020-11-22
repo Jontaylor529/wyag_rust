@@ -11,6 +11,8 @@ pub struct GitRepository {
 fn default_config() -> Ini {
     let mut config = Ini::new();
     config.set("core", "repositoryformatversion", Some("0".to_owned()));
+    config.set("core", "filemode", Some("fasle".to_owned()));
+    config.set("core", "bare", Some("false".to_owned()));
     config
 }
 
@@ -112,7 +114,7 @@ impl GitRepository {
 mod tests {
     use super::*;
 
-    fn init_test_repo(temp_dir:&str) -> GitRepository {
+    fn init_test_repo(temp_dir: &str) -> GitRepository {
         let worktree = get_test_dir(temp_dir);
         let gitdir = worktree.join(".git");
         let config = Ini::new();
@@ -123,8 +125,12 @@ mod tests {
         }
     }
 
-    fn get_test_dir(sub_dir:&str) -> PathBuf {
-        ["C:\\","users","gameo","appdata","local","temp","testing",sub_dir].iter().collect::<PathBuf>()
+    fn get_test_dir(sub_dir: &str) -> PathBuf {
+        [
+            "C:\\", "users", "gameo", "appdata", "local", "temp", "testing", sub_dir,
+        ]
+        .iter()
+        .collect::<PathBuf>()
     }
 
     #[test]
@@ -132,7 +138,8 @@ mod tests {
         let test_repo = init_test_repo("create_repo_path");
         let rel_head: PathBuf = ["refs", "head"].iter().collect();
         let head = test_repo.repo_path(&rel_head);
-        let res_path = get_test_dir("create_repo_path").join([".git", "refs", "head"].iter().collect::<PathBuf>());
+        let res_path = get_test_dir("create_repo_path")
+            .join([".git", "refs", "head"].iter().collect::<PathBuf>());
         assert!(head == res_path, "was {}", head.to_string_lossy());
     }
 
@@ -141,7 +148,8 @@ mod tests {
         //setup
         let test_repo = init_test_repo("create_repo_dir");
         let rel_path: PathBuf = ["refs", "head"].iter().collect();
-        let res_dir = get_test_dir("create_repo_dir").join([".git", "refs", "head"].iter().collect::<PathBuf>());
+        let res_dir = get_test_dir("create_repo_dir")
+            .join([".git", "refs", "head"].iter().collect::<PathBuf>());
         //clean
         if Path::exists(&res_dir) {
             std::fs::remove_dir_all(&res_dir).expect("unable to clean directory");
