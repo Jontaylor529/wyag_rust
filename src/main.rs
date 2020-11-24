@@ -26,7 +26,7 @@ fn main() {
         if let Some(path) = sub_matches.value_of("path") {
             match GitRepository::init(path) {
                 Ok(_) => (),
-                Err(err) => println!("Error initializing {}", err),
+                Err(err) => println!("Error initializing: {}", err),
             }
         } else {
             println!("No value given for path")
