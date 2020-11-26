@@ -1,10 +1,14 @@
 use configparser::ini::Ini;
 use std::fs::*;
-use std::io::{Error, ErrorKind};
+use std::io::{Error, ErrorKind,Read};
 use std::path::{Path, PathBuf, MAIN_SEPARATOR};
+use flate2::read::ZlibDecoder;
 
 pub mod WyagError;
+pub mod git_object;
+
 use WyagError::*;
+use git_object::GitObject;
 
 pub struct GitRepository {
     worktree: PathBuf,
@@ -141,8 +145,43 @@ impl GitRepository {
             ))
         }
     }
+
+    fn read_object(&self,sha:&str) -> Result<Box<dyn GitObject>,ObjectParseError> {
+
+        let rel_path: PathBuf =  ["objects", &sha[..1], &sha[2..]].iter().collect();
+        let path = self.repo_file(&rel_path, false)?;
+        let raw = decompress_file_to_bytes(&path)?.iter();
+        let obj_type = raw.take_while(|b|  **b != 0x20).copied().collect::<Vec<u8>>();
+        let obj_type_string = String::from_utf8_lossy(&obj_type);
+        //skip space
+        raw.next();
+        let obj_size = raw.take_while(|b| **b!= 0x00).copied().collect::<Vec<u8>>();
+        let obj_size_int: usize = String::from_utf8_lossy(&obj_size).parse()?;
+        //skip null
+        raw.next();
+        let content = raw.copied().collect::<Vec<u8>>();
+        if content.len() != obj_size_int {
+            Err(ObjectParseError::ObjectWrongSize())
+        } else {
+            let content_str = String::from_utf8_lossy(&content);
+            match &(*obj_type_string) {
+                "commit" => Err(ObjectParseError::ObjectTypeNotRecognized()),
+                _ => Err(ObjectParseError::ObjectTypeNotRecognized())
+            }
+        }
+        
+        
+
+    }
 } //impl GitRepo
 
+fn decompress_file_to_bytes(path:&Path) -> Result<Vec<u8>,std::io::Error> {
+    let bytes = std::fs::read(path)?;
+        let mut decoder = ZlibDecoder::new(&bytes[..]);
+        let mut raw = Vec::<u8>::new();
+        decoder.read(&mut raw);
+        Ok(raw)
+}
 #[cfg(test)]
 mod tests {
     use super::*;
