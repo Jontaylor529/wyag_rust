@@ -1,14 +1,14 @@
 use configparser::ini::Ini;
-use std::fs::*;
-use std::io::{Error, ErrorKind,Read};
-use std::path::{Path, PathBuf, MAIN_SEPARATOR};
 use flate2::read::ZlibDecoder;
+use std::fs::*;
+use std::io::{Error, ErrorKind, Read};
+use std::path::{Path, PathBuf, MAIN_SEPARATOR};
 
 pub mod WyagError;
 pub mod git_object;
 
-use WyagError::*;
 use git_object::GitObject;
+use WyagError::*;
 
 pub struct GitRepository {
     worktree: PathBuf,
@@ -25,7 +25,7 @@ fn default_config() -> Ini {
 }
 
 //TODO this should live somehwere else
-fn clean_unc(path:PathBuf) -> PathBuf {
+fn clean_unc(path: PathBuf) -> PathBuf {
     let str_path = path.to_string_lossy();
     if str_path.starts_with(r"\\?\") {
         //Unwrap safe because of check???
@@ -35,25 +35,33 @@ fn clean_unc(path:PathBuf) -> PathBuf {
     }
 }
 
-fn find_repo_dir(path:&str) -> Result<PathBuf, InternalError> {
-    println!("{}",path);
+fn find_repo_dir(path: &str) -> Result<PathBuf, InternalError> {
+    println!("{}", path);
     let path = PathBuf::from(path).canonicalize()?;
     let path = clean_unc(path);
-    println!("{}",path.to_str().unwrap());
+    println!("{}", path.to_str().unwrap());
     let git_dir = path.join(".git");
-        
-        if git_dir.exists() {
-            Ok(path)
+
+    if git_dir.exists() {
+        Ok(path)
+    } else {
+        if let Some(parent) = path.parent() {
+            find_repo_dir(parent.to_str().unwrap())
         } else {
-            if let Some(parent) = path.parent() {
-                find_repo_dir(parent.to_str().unwrap())
-            } else {
-                Err(InternalError::NotAGitDirectory())
-            }
+            Err(InternalError::NotAGitDirectory())
         }
+    }
 }
 
 impl GitRepository {
+    pub fn new() -> GitRepository {
+        GitRepository {
+            worktree: PathBuf::new(),
+            gitdir: PathBuf::new(),
+            config: Ini::new(),
+        }
+    }
+
     pub fn init(path: &str) -> Result<GitRepository, InternalError> {
         let path = PathBuf::from(path);
         let git_dir = path.join(".git");
@@ -103,7 +111,7 @@ impl GitRepository {
     }
 
     //TODO get rid of unwraps here
-    fn find_repo(path:&str) -> Result<GitRepository, InternalError> {
+    fn find_repo(path: &str) -> Result<GitRepository, InternalError> {
         let git_dir = find_repo_dir(path)?;
         GitRepository::at_path(path, false)
     }
@@ -146,41 +154,47 @@ impl GitRepository {
         }
     }
 
-    fn read_object(&self,sha:&str) -> Result<Box<dyn GitObject>,ObjectParseError> {
-
-        let rel_path: PathBuf =  ["objects", &sha[..1], &sha[2..]].iter().collect();
+    fn read_object(&self, sha: &str) -> Result<Box<dyn GitObject>, ObjectParseError> {
+        let rel_path: PathBuf = ["objects", &sha[..1], &sha[2..]].iter().collect();
         let path = self.repo_file(&rel_path, false)?;
-        let raw = decompress_file_to_bytes(&path)?.iter();
-        let obj_type = raw.take_while(|b|  **b != 0x20).copied().collect::<Vec<u8>>();
-        let obj_type_string = String::from_utf8_lossy(&obj_type);
-        //skip space
-        raw.next();
-        let obj_size = raw.take_while(|b| **b!= 0x00).copied().collect::<Vec<u8>>();
-        let obj_size_int: usize = String::from_utf8_lossy(&obj_size).parse()?;
-        //skip null
-        raw.next();
-        let content = raw.copied().collect::<Vec<u8>>();
-        if content.len() != obj_size_int {
-            Err(ObjectParseError::ObjectWrongSize())
-        } else {
-            let content_str = String::from_utf8_lossy(&content);
-            match &(*obj_type_string) {
-                "commit" => Err(ObjectParseError::ObjectTypeNotRecognized()),
-                _ => Err(ObjectParseError::ObjectTypeNotRecognized())
-            }
-        }
-        
-        
+        let raw = decompress_file_to_bytes(&path)?;
+        let is_ascii_space = |b: &u8| *b == 0x20;
+        let is_ascii_null = |b: &u8| *b == 0x00;
+        if let Some(end_object_type) = raw.iter().position(is_ascii_space) {
+            if let Some(end_obj_size) = raw.iter().skip(end_object_type).position(is_ascii_null) {
+                let obj_type = &raw[..end_object_type - 1];
+                let obj_size = &raw[end_object_type + 1..end_obj_size - 1];
+                let obj_content = &raw[end_obj_size + 1..];
 
+                let obj_size: usize = String::from_utf8_lossy(&obj_size).parse()?;
+                if obj_size == obj_content.len() {
+                    let obj_type = String::from_utf8_lossy(obj_type);
+                    let obj_content = String::from_utf8_lossy(obj_content);
+                    if let Some(git_object) =
+                        git_object::factory(&(*obj_type), (*obj_content).to_owned())
+                    {
+                        Ok(git_object)
+                    } else {
+                        Err(ObjectParseError::ObjectTypeNotRecognized())
+                    }
+                } else {
+                    Err(ObjectParseError::ObjectWrongSize())
+                }
+            } else {
+                Err(ObjectParseError::SizeNotFound())
+            }
+        } else {
+            Err(ObjectParseError::ObjectTypeNotRecognized())
+        }
     }
 } //impl GitRepo
 
-fn decompress_file_to_bytes(path:&Path) -> Result<Vec<u8>,std::io::Error> {
+fn decompress_file_to_bytes(path: &Path) -> Result<Vec<u8>, std::io::Error> {
     let bytes = std::fs::read(path)?;
-        let mut decoder = ZlibDecoder::new(&bytes[..]);
-        let mut raw = Vec::<u8>::new();
-        decoder.read(&mut raw);
-        Ok(raw)
+    let mut decoder = ZlibDecoder::new(&bytes[..]);
+    let mut raw = Vec::<u8>::new();
+    decoder.read(&mut raw);
+    Ok(raw)
 }
 #[cfg(test)]
 mod tests {
@@ -271,31 +285,33 @@ mod tests {
                 assert!(repo.worktree == test_dir);
                 assert!(test_dir.join(".git").exists());
             }
-            Err(err) => assert!(false, "Error initializing repo: {}",err)
+            Err(err) => assert!(false, "Error initializing repo: {}", err),
         }
-        
     }
 
     #[test]
     fn find_repo_in_path() {
         let test_dir = get_test_dir("find_repo_in_path");
-        let deep_dir = test_dir.join(
-            ["A","B","C"].iter().collect::<PathBuf>());
-        let git_dir = test_dir.join(
-            ["A",".git"].iter().collect::<PathBuf>());
-        if !deep_dir.exists() {std::fs::create_dir_all(&deep_dir).expect("Problem creating directory structure");}
-        if !git_dir.exists() {std::fs::create_dir(&git_dir).expect("Problem creating git directory");} 
+        let deep_dir = test_dir.join(["A", "B", "C"].iter().collect::<PathBuf>());
+        let git_dir = test_dir.join(["A", ".git"].iter().collect::<PathBuf>());
+        if !deep_dir.exists() {
+            std::fs::create_dir_all(&deep_dir).expect("Problem creating directory structure");
+        }
+        if !git_dir.exists() {
+            std::fs::create_dir(&git_dir).expect("Problem creating git directory");
+        }
 
         match find_repo_dir(deep_dir.to_str().unwrap()) {
             //There is weird case stuff here that only works on Windows, that's why there is the to_lower
             Ok(repo_dir) => assert!(
-             repo_dir.to_str().unwrap().to_lowercase() ==
-             git_dir.parent().unwrap().to_str().unwrap().to_lowercase(),
-             "found git dir at: {}, was at {}",
-            repo_dir.to_str().unwrap(),
-            git_dir.parent().unwrap().to_str().unwrap()),
+                repo_dir.to_str().unwrap().to_lowercase()
+                    == git_dir.parent().unwrap().to_str().unwrap().to_lowercase(),
+                "found git dir at: {}, was at {}",
+                repo_dir.to_str().unwrap(),
+                git_dir.parent().unwrap().to_str().unwrap()
+            ),
 
-            Err(error) => assert!(false,"Problem finding repo: {}",error),
+            Err(error) => assert!(false, "Problem finding repo: {}", error),
         }
     }
 }

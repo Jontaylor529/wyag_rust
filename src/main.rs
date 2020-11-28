@@ -1,6 +1,6 @@
 pub mod lib;
-use lib::*;
 use clap::{App, Arg, SubCommand};
+use lib::*;
 
 fn make_parser() -> App<'static, 'static> {
     App::new("wyag")
@@ -31,8 +31,7 @@ fn main() {
         } else {
             println!("No value given for path")
         }
-    }
-    else {
+    } else {
         println!("not  a valid command")
     }
 }
