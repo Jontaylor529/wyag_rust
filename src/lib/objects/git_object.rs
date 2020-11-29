@@ -1,4 +1,6 @@
-use crate::lib::GitRepository;
+use std::path::PathBuf;
+use crate::lib::objects::git_repository::GitRepository;
+use configparser::ini::Ini;
 pub trait GitObject {
     fn repo(&self) -> &GitRepository;
     fn serialize(&self) -> ();
@@ -12,7 +14,7 @@ pub struct Commit {
 impl Commit {
     pub fn new() -> Commit {
         Commit {
-            repo: GitRepository::new(),
+            repo: GitRepository::new(PathBuf::new(),PathBuf::new(),Ini::new()),
         }
     }
 }

@@ -1,6 +1,6 @@
 pub mod lib;
-use clap::{App, Arg, SubCommand};
-use lib::*;
+use clap::{App, Arg};
+use lib::objects::git_repository::GitRepository;
 
 fn make_parser() -> App<'static, 'static> {
     App::new("wyag")
