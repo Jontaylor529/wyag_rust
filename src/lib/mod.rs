@@ -1,7 +1,5 @@
-use configparser::ini::Ini;
 use flate2::read::ZlibDecoder;
-use std::fs::*;
-use std::io::{Error, ErrorKind, Read};
+use std::io::{Read};
 use std::path::{Path, PathBuf};
 
 pub mod error;
@@ -24,7 +22,7 @@ fn decompress_file_to_bytes(path: &Path) -> Result<Vec<u8>, std::io::Error> {
     let bytes = std::fs::read(path)?;
     let mut decoder = ZlibDecoder::new(&bytes[..]);
     let mut raw = Vec::<u8>::new();
-    decoder.read(&mut raw);
+    decoder.read(&mut raw)?;
     Ok(raw)
 }
 

@@ -54,7 +54,7 @@ mod tests {
         let matches = parser.get_matches_from(args.iter());
 
         if matches.is_present("init") {
-            if let Some(path) = matches.subcommand_matches("init").unwrap().value_of("path") {
+            if let Some(_) = matches.subcommand_matches("init").unwrap().value_of("path") {
             } else {
                 assert!(false)
             }

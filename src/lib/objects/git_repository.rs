@@ -41,7 +41,7 @@ impl GitRepository {
         } else {
             std::fs::create_dir_all(&git_dir)?;
             let config = default_config();
-            config.write(git_dir.join("config").to_str().unwrap());
+            config.write(git_dir.join("config").to_str().unwrap())?;
             GitRepository::at_path(path.to_str().unwrap(), false)
         }
     }
@@ -84,7 +84,8 @@ impl GitRepository {
     //TODO get rid of unwraps here
     pub fn find_repo(path: &str) -> Result<GitRepository, GitError> {
         let git_dir = find_repo_dir(path)?;
-        GitRepository::at_path(path, false)
+        let git_dir = git_dir.to_str().ok_or(GitError::Parse())?;
+        GitRepository::at_path(git_dir, false)
     }
 
     pub fn repo_path(&self, path: &Path) -> PathBuf {

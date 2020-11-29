@@ -52,7 +52,7 @@ impl Tag {
     }
 }
 
-pub fn factory(object_name: &str, content: String) -> Option<Box<dyn GitObject>> {
+pub fn factory(object_name: &str, _content: String) -> Option<Box<dyn GitObject>> {
     match object_name {
         "Commit" => Some(Box::new(Commit::new())),
         _ => None,
