@@ -1,6 +1,6 @@
 pub mod lib;
 use clap::{App, Arg};
-use lib::objects::git_repository::GitRepository;
+use lib::commands::init;
 
 fn make_parser() -> App<'static, 'static> {
     App::new("wyag")
@@ -24,7 +24,7 @@ fn main() {
     if matches.is_present("init") {
         let sub_matches = matches.subcommand_matches("init").unwrap();
         if let Some(path) = sub_matches.value_of("path") {
-            match GitRepository::init(path) {
+            match init(path) {
                 Ok(_) => (),
                 Err(err) => println!("Error initializing: {}", err),
             }

@@ -4,10 +4,8 @@ use std::path::{Path, PathBuf};
 
 pub mod error;
 pub mod objects;
+pub mod commands;
 
-
-
-//TODO this should live somehwere else
 fn clean_unc(path: PathBuf) -> PathBuf {
     let str_path = path.to_string_lossy();
     if str_path.starts_with(r"\\?\") {
@@ -18,11 +16,10 @@ fn clean_unc(path: PathBuf) -> PathBuf {
     }
 }
 
-fn decompress_file_to_bytes(path: &Path) -> Result<Vec<u8>, std::io::Error> {
-    let bytes = std::fs::read(path)?;
-    let mut decoder = ZlibDecoder::new(&bytes[..]);
-    let mut raw = Vec::<u8>::new();
-    decoder.read(&mut raw)?;
-    Ok(raw)
+fn get_test_dir(sub_dir: &str) -> PathBuf {
+    [
+        "C:\\", "users", "gameo", "appdata", "local", "temp", "testing", sub_dir,
+    ]
+    .iter()
+    .collect::<PathBuf>()
 }
-

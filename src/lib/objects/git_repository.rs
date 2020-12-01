@@ -1,10 +1,8 @@
 use std::path::{PathBuf,Path};
 use std::io::{ErrorKind};
 use configparser::ini::Ini;
-use super::super::error::git::GitError;
-use super::super::error::object::ObjectParseError;
-use crate::lib::{clean_unc,decompress_file_to_bytes};
-use super::git_object::{GitObject,factory};
+use crate::lib::error::git::GitError;
+use crate::lib::{clean_unc};
 
 pub struct GitRepository {
     worktree: PathBuf,
@@ -33,21 +31,8 @@ impl GitRepository {
         &self.config
     }
 
-    pub fn init(path: &str) -> Result<GitRepository, GitError> {
-        let path = PathBuf::from(path);
-        let git_dir = path.join(".git");
-        if git_dir.exists() {
-            Err(GitError::AlreadyGitDirectory())
-        } else {
-            std::fs::create_dir_all(&git_dir)?;
-            let config = default_config();
-            config.write(git_dir.join("config").to_str().unwrap())?;
-            GitRepository::at_path(path.to_str().unwrap(), false)
-        }
-    }
-
-    pub fn at_path(path: &str, force: bool) -> Result<GitRepository, GitError> {
-        let worktree = PathBuf::from(path);
+    pub fn at_path<P: Into<PathBuf>>(path: P, force: bool) -> Result<GitRepository, GitError> {
+        let worktree: PathBuf = path.into();
         let gitdir = worktree.join(".git");
         let mut config = Ini::new();
         let config_path = gitdir.join("config");
@@ -81,25 +66,18 @@ impl GitRepository {
         })
     }
 
-    //TODO get rid of unwraps here
-    pub fn find_repo(path: &str) -> Result<GitRepository, GitError> {
-        let git_dir = find_repo_dir(path)?;
-        let git_dir = git_dir.to_str().ok_or(GitError::Parse())?;
-        GitRepository::at_path(git_dir, false)
-    }
-
-    pub fn repo_path(&self, path: &Path) -> PathBuf {
+    pub fn repo_path<P: AsRef<Path>>(&self, path: P) -> PathBuf {
         self.gitdir.join(path)
     }
 
-    pub fn repo_dir(&self, path: &Path, mkdir: bool) -> Result<PathBuf, std::io::Error> {
+    pub fn repo_dir<P: AsRef<Path>>(&self, path: P, mkdir: bool) -> Result<PathBuf, std::io::Error> {
         let path = self.repo_path(path);
 
         if path.exists() {
-            return Ok(path);
+            Ok(path)
         } else if mkdir {
             std::fs::create_dir_all(path.to_str().unwrap_or(""))?;
-            return Ok(path);
+            Ok(path)
         } else {
             Err(std::io::Error::new(
                 ErrorKind::NotFound,
@@ -125,55 +103,11 @@ impl GitRepository {
             ))
         }
     }
-
-    pub fn read_object(&self, sha: &str) -> Result<Box<dyn GitObject>, ObjectParseError> {
-        let rel_path: PathBuf = ["objects", &sha[..1], &sha[2..]].iter().collect();
-        let path = self.repo_file(&rel_path, false)?;
-        let raw = decompress_file_to_bytes(&path)?;
-        let is_ascii_space = |b: &u8| *b == 0x20;
-        let is_ascii_null = |b: &u8| *b == 0x00;
-        if let Some(end_object_type) = raw.iter().position(is_ascii_space) {
-            if let Some(end_obj_size) = raw.iter().skip(end_object_type).position(is_ascii_null) {
-                let obj_type = &raw[..end_object_type - 1];
-                let obj_size = &raw[end_object_type + 1..end_obj_size - 1];
-                let obj_content = &raw[end_obj_size + 1..];
-
-                let obj_size: usize = String::from_utf8_lossy(&obj_size).parse()?;
-                if obj_size == obj_content.len() {
-                    let obj_type = String::from_utf8_lossy(obj_type);
-                    let obj_content = String::from_utf8_lossy(obj_content);
-                    if let Some(git_object) =
-                        factory(&(*obj_type), (*obj_content).to_owned())
-                    {
-                        Ok(git_object)
-                    } else {
-                        Err(ObjectParseError::ObjectTypeNotRecognized())
-                    }
-                } else {
-                    Err(ObjectParseError::ObjectWrongSize())
-                }
-            } else {
-                Err(ObjectParseError::SizeNotFound())
-            }
-        } else {
-            Err(ObjectParseError::ObjectTypeNotRecognized())
-        }
-    }
 } //impl GitRepo
 
-fn default_config() -> Ini {
-    let mut config = Ini::new();
-    config.set("core", "repositoryformatversion", Some("0".to_owned()));
-    config.set("core", "filemode", Some("false".to_owned()));
-    config.set("core", "bare", Some("false".to_owned()));
-    config
-}
-
-fn find_repo_dir(path: &str) -> Result<PathBuf, GitError> {
-    println!("{}", path);
-    let path = PathBuf::from(path).canonicalize()?;
+fn find_repo_dir<P: Into<PathBuf>>(path: P) -> Result<PathBuf, GitError> {
+    let path = path.into().canonicalize()?;
     let path = clean_unc(path);
-    println!("{}", path.to_str().unwrap());
     let git_dir = path.join(".git");
 
     if git_dir.exists() {
@@ -192,20 +126,13 @@ mod tests {
     use super::{GitRepository,find_repo_dir};
     use configparser::ini::Ini;
     use std::path::{Path,PathBuf};
+    use crate::lib::get_test_dir;
 
     fn init_test_repo(temp_dir: &str) -> GitRepository {
         let worktree = get_test_dir(temp_dir);
         let gitdir = worktree.join(".git");
         let config = Ini::new();
         GitRepository::new(worktree, gitdir, config)
-    }
-
-    fn get_test_dir(sub_dir: &str) -> PathBuf {
-        [
-            "C:\\", "users", "gameo", "appdata", "local", "temp", "testing", sub_dir,
-        ]
-        .iter()
-        .collect::<PathBuf>()
     }
 
     #[test]
@@ -231,7 +158,7 @@ mod tests {
         }
         //test
         let repo_dir = test_repo
-            .repo_dir(rel_path.as_ref(), true)
+            .repo_dir(rel_path, true)
             .expect("Error with repo_dir");
 
         assert!(res_dir == repo_dir, "was {}", repo_dir.to_str().unwrap());
@@ -263,20 +190,7 @@ mod tests {
         assert!(repo_file.exists());
     }
 
-    #[test]
-    fn create_default_repo() {
-        let test_dir = get_test_dir("create_default_repo");
-        if test_dir.join(".git").exists() {
-            std::fs::remove_dir_all(&test_dir.join(".git")).expect("Error cleaning directory");
-        }
-        match GitRepository::init(test_dir.to_str().unwrap()) {
-            Ok(repo) => {
-                assert!(repo.worktree() == test_dir);
-                assert!(test_dir.join(".git").exists());
-            }
-            Err(err) => assert!(false, "Error initializing repo: {}", err),
-        }
-    }
+   
 
     #[test]
     fn find_repo_in_path() {
