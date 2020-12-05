@@ -1,60 +1,76 @@
 use std::path::PathBuf;
 use crate::lib::objects::git_repository::GitRepository;
 use configparser::ini::Ini;
-pub trait GitObject {
-    fn repo(&self) -> &GitRepository;
-    fn serialize(&self) -> ();
-    fn deserialize(&self) -> ();
+use std::str::FromStr;
+
+#[derive(PartialEq)]
+pub enum ObjectType {
+    Commit,
+    Tree,
+    Blob,
+    Tag,
 }
 
-pub struct Commit {
-    repo: GitRepository,
-}
-
-impl Commit {
-    pub fn new() -> Commit {
-        Commit {
-            repo: GitRepository::new(PathBuf::new(),PathBuf::new(),Ini::new()),
+impl ToString for ObjectType {
+    fn to_string(&self) -> String {
+        match self {
+            ObjectType::Commit => "Commit".to_owned(),
+            ObjectType::Tag => "Tag".to_owned(),
+            ObjectType::Tree => "Tree".to_owned(),
+            ObjectType::Blob => "Blob".to_owned(),
         }
     }
 }
 
-impl GitObject for Commit {
-    fn repo(&self) -> &GitRepository {
-        &self.repo
-    }
-
-    fn serialize(&self) -> () {}
-
-    fn deserialize(&self) -> () {}
+#[derive(Debug)]
+pub struct InvalidObject {
+    name: String,
 }
 
-pub struct Tree {}
+impl FromStr for ObjectType {
+    type Err = InvalidObject;
 
-impl Tree {
-    pub fn new() -> Tree {
-        Tree {}
-    }
-}
-
-pub struct Blob {}
-
-impl Blob {
-    pub fn new() -> Blob {
-        Blob {}
-    }
-}
-pub struct Tag {}
-
-impl Tag {
-    pub fn new() -> Tag {
-        Tag {}
+    fn from_str(s: &str) -> Result<ObjectType, InvalidObject> {
+        match s.to_lowercase().as_ref() {
+            "commit" => Ok(ObjectType::Commit),
+            "tree" => Ok(ObjectType::Tree),
+            "blob" => Ok(ObjectType::Blob),
+            "tag" => Ok(ObjectType::Tag),
+            _ => Err(InvalidObject{name: s.to_owned()}),
+        }
     }
 }
 
-pub fn factory(object_name: &str, _content: String) -> Option<Box<dyn GitObject>> {
-    match object_name {
-        "Commit" => Some(Box::new(Commit::new())),
-        _ => None,
-    }
+pub struct GitObject<'a> {
+    kind: ObjectType,
+    content: String,
+    repo: &'a GitRepository,
 }
+
+impl<'a> GitObject<'a> {
+    pub fn new(kind: ObjectType, content: String, repo: &'a GitRepository) -> GitObject {
+        GitObject {
+            kind,
+            content,
+            repo,
+        }
+    }
+
+    pub fn serialize() -> () {
+
+    }
+
+    pub fn deserialize() -> () {
+
+    }
+
+    pub fn kind(&self) -> &ObjectType {
+        &self.kind
+    }
+
+    pub fn repo(&self) -> &GitRepository {
+        self.repo
+    }
+
+}
+

@@ -66,44 +66,46 @@ impl GitRepository {
         })
     }
 
-    pub fn repo_path<P: AsRef<Path>>(&self, path: P) -> PathBuf {
-        self.gitdir.join(path)
-    }
-
-    pub fn repo_dir<P: AsRef<Path>>(&self, path: P, mkdir: bool) -> Result<PathBuf, std::io::Error> {
-        let path = self.repo_path(path);
-
-        if path.exists() {
-            Ok(path)
-        } else if mkdir {
-            std::fs::create_dir_all(path.to_str().unwrap_or(""))?;
-            Ok(path)
-        } else {
-            Err(std::io::Error::new(
-                ErrorKind::NotFound,
-                "Path does not exist",
-            ))
-        }
-    }
-
-    pub fn repo_file(&self, path: &Path, mkdir: bool) -> Result<PathBuf, std::io::Error> {
-        let path = self.repo_path(path);
-        if path.is_file() {
-            Ok(path)
-        } else if mkdir {
-            let mut dir = path.clone();
-            dir.pop();
-            self.repo_dir(&dir, mkdir)?;
-            std::fs::File::create(&path)?;
-            Ok(path)
-        } else {
-            Err(std::io::Error::new(
-                ErrorKind::NotFound,
-                "File does not exist",
-            ))
-        }
-    }
+    
 } //impl GitRepo
+
+pub(crate) fn repo_path<P: AsRef<Path>>(repo: &GitRepository, path: P) -> PathBuf {
+    repo.gitdir().join(path)
+}
+
+pub(crate) fn repo_dir<P: AsRef<Path>>(repo: &GitRepository, path: P, mkdir: bool) -> Result<PathBuf, std::io::Error> {
+    let path = repo_path(repo, path);
+
+    if path.exists() {
+        Ok(path)
+    } else if mkdir {
+        std::fs::create_dir_all(path.to_str().unwrap_or(""))?;
+        Ok(path)
+    } else {
+        Err(std::io::Error::new(
+            ErrorKind::NotFound,
+            "Path does not exist",
+        ))
+    }
+}
+
+pub(crate) fn repo_file(repo: &GitRepository, path: &Path, mkdir: bool) -> Result<PathBuf, std::io::Error> {
+    let path = repo_path(repo, path);
+    if path.is_file() {
+        Ok(path)
+    } else if mkdir {
+        let mut dir = path.clone();
+        dir.pop();
+        repo_dir(repo, &dir, mkdir)?;
+        std::fs::File::create(&path)?;
+        Ok(path)
+    } else {
+        Err(std::io::Error::new(
+            ErrorKind::NotFound,
+            format!("File does not exist in repo: {}",path.to_string_lossy()),
+        ))
+    }
+}
 
 fn find_repo_dir<P: Into<PathBuf>>(path: P) -> Result<PathBuf, GitError> {
     let path = path.into().canonicalize()?;
@@ -123,7 +125,7 @@ fn find_repo_dir<P: Into<PathBuf>>(path: P) -> Result<PathBuf, GitError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{GitRepository,find_repo_dir};
+    use super::*;
     use configparser::ini::Ini;
     use std::path::{Path,PathBuf};
     use crate::lib::get_test_dir;
@@ -139,7 +141,7 @@ mod tests {
     fn create_repo_path() {
         let test_repo = init_test_repo("create_repo_path");
         let rel_head: PathBuf = ["refs", "head"].iter().collect();
-        let head = test_repo.repo_path(&rel_head);
+        let head = repo_path(&test_repo,&rel_head);
         let res_path = get_test_dir("create_repo_path")
             .join([".git", "refs", "head"].iter().collect::<PathBuf>());
         assert!(head == res_path, "was {}", head.to_string_lossy());
@@ -157,8 +159,8 @@ mod tests {
             std::fs::remove_dir_all(&res_dir).expect("unable to clean directory");
         }
         //test
-        let repo_dir = test_repo
-            .repo_dir(rel_path, true)
+        let repo_dir = 
+             repo_dir(&test_repo,rel_path, true)
             .expect("Error with repo_dir");
 
         assert!(res_dir == repo_dir, "was {}", repo_dir.to_str().unwrap());
@@ -175,8 +177,7 @@ mod tests {
             std::fs::remove_file(&res_file).expect("unable to clean directory");
         }
 
-        let repo_file = test_repo
-            .repo_file(rel_path.as_ref(), true)
+        let repo_file = repo_file(&test_repo, rel_path.as_ref(), true)
             .expect(&format!(
                 "Error with repo_file at {}",
                 res_file.to_string_lossy()

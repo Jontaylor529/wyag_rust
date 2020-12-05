@@ -1,11 +1,11 @@
 use std::fmt;
 
-
+#[derive(Debug)]
 pub enum ObjectParseError {
     SizeNotNumber(std::num::ParseIntError),
     ObjectWrongSize(),
     IOError(std::io::Error),
-    ObjectTypeNotRecognized(),
+    ObjectTypeNotRecognized(String),
     SizeNotFound(),
     TypeNotFound(),
 }
@@ -22,8 +22,8 @@ impl std::fmt::Display for ObjectParseError {
             ObjectParseError::IOError(io_error) => {
                 write!(f, "Could not open file for reading: {}", io_error)
             }
-            ObjectParseError::ObjectTypeNotRecognized() => {
-                write!(f, "Object type is not recognized/supported")
+            ObjectParseError::ObjectTypeNotRecognized(s) => {
+                write!(f, "Object type is not recognized/supported {}", s)
             }
             ObjectParseError::SizeNotFound() => {
                 write!(f, "Ascii null not found at the end of object size")
