@@ -4,6 +4,7 @@ use super::super::error::object::ObjectParseError;
 use std::path::{PathBuf,Path};
 use flate2::read::ZlibDecoder;
 use std::io::Read;
+use sha1::{Sha1,Digest};
 
 struct ObjectData {
     length: String,
@@ -78,6 +79,29 @@ pub fn read_object<'a>(repo: &'a GitRepository, sha: &str) -> Result<GitObject<'
     validate_object(repo, data)
 }
 
+fn hash_object(object: &GitObject) -> Vec<u8> {
+    let data = object.serialize();
+    let type_string = object.kind().to_string();
+    let type_bytes = type_string.as_bytes();
+    let len_string = data.len().to_string();
+    let len_bytes = len_string.as_bytes();
+    let null: u32 = 0x00;
+    let null = null.to_be_bytes();
+    let result = [type_bytes, b" ", len_bytes, &null, &data].concat();
+
+    let mut hasher = Sha1::new();
+    hasher.update(&result);
+    hasher.finalize().as_slice().to_owned()
+}
+
+fn write_object(object: &GitObject) -> Result<(),std::io::Error> {
+    let hash = hash_object(object);
+    let p1 = format!("{:x?}",&hash[..2]);
+    let p2 = format!("{:x?}",&hash[2..]);
+    let path = PathBuf::new().join(p1).join(p2);
+    let file = repo_file(object.repo(), path, true)?;
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
     use crate::lib::get_test_dir;
@@ -115,5 +139,14 @@ mod tests {
 
         let res = read_object(&test_repo, "05f01ab76171493c8ab7dc46d0abdbc94ed85372").expect("Error reading object");
         assert!(true);
+    }
+
+    #[test]
+    fn hash_an_object() {
+        let test_repo = GitRepository::new(PathBuf::new(),PathBuf::new(),configparser::ini::Ini::new());
+        let test_obj = GitObject::new(ObjectType::Blob,"Not real content".to_owned(),&test_repo);
+        let hash = hash_object(&test_obj);
+        let hash_str: String = format!("{:x?}",&hash);
+        assert!(hash_str == "[cc, d4, e8, f9, 5c, f9, 1b, 38, da, 8b, 25, ba, 2d, 77, bc, 74, c2, a8, 81, d9]", "Hash was {}", hash_str);
     }
 }

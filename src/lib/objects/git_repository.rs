@@ -89,7 +89,7 @@ pub(crate) fn repo_dir<P: AsRef<Path>>(repo: &GitRepository, path: P, mkdir: boo
     }
 }
 
-pub(crate) fn repo_file(repo: &GitRepository, path: &Path, mkdir: bool) -> Result<PathBuf, std::io::Error> {
+pub(crate) fn repo_file<P: AsRef<Path>>(repo: &GitRepository, path: P, mkdir: bool) -> Result<PathBuf, std::io::Error> {
     let path = repo_path(repo, path);
     if path.is_file() {
         Ok(path)
@@ -177,7 +177,7 @@ mod tests {
             std::fs::remove_file(&res_file).expect("unable to clean directory");
         }
 
-        let repo_file = repo_file(&test_repo, rel_path.as_ref(), true)
+        let repo_file = repo_file(&test_repo, rel_path, true)
             .expect(&format!(
                 "Error with repo_file at {}",
                 res_file.to_string_lossy()

@@ -56,8 +56,8 @@ impl<'a> GitObject<'a> {
         }
     }
 
-    pub fn serialize() -> () {
-
+    pub fn serialize(&self) -> Vec<u8> {
+        Vec::<u8>::new()
     }
 
     pub fn deserialize() -> () {
