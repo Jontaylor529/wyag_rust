@@ -17,9 +17,5 @@ fn clean_unc(path: PathBuf) -> PathBuf {
 }
 
 fn get_test_dir(sub_dir: &str) -> PathBuf {
-    [
-        "C:\\", "users", "gameo", "appdata", "local", "temp", "testing", sub_dir,
-    ]
-    .iter()
-    .collect::<PathBuf>()
+    std::env::temp_dir().join("testing").join(sub_dir)
 }
