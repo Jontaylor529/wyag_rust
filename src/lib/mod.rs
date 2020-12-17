@@ -1,10 +1,10 @@
 use flate2::read::ZlibDecoder;
-use std::io::{Read};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
+pub mod commands;
 pub mod error;
 pub mod objects;
-pub mod commands;
 
 fn clean_unc(path: PathBuf) -> PathBuf {
     let str_path = path.to_string_lossy();

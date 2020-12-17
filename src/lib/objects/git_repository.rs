@@ -1,8 +1,8 @@
-use std::path::{PathBuf,Path};
-use std::io::{ErrorKind};
-use configparser::ini::Ini;
+use crate::lib::clean_unc;
 use crate::lib::error::git::GitError;
-use crate::lib::{clean_unc};
+use configparser::ini::Ini;
+use std::io::ErrorKind;
+use std::path::{Path, PathBuf};
 
 pub struct GitRepository {
     worktree: PathBuf,
@@ -11,7 +11,7 @@ pub struct GitRepository {
 }
 
 impl GitRepository {
-    pub fn new(worktree:PathBuf, gitdir:PathBuf, config:Ini) -> GitRepository {
+    pub fn new(worktree: PathBuf, gitdir: PathBuf, config: Ini) -> GitRepository {
         GitRepository {
             worktree,
             gitdir,
@@ -65,15 +65,17 @@ impl GitRepository {
             config,
         })
     }
-
-    
 } //impl GitRepo
 
 pub(crate) fn repo_path<P: AsRef<Path>>(repo: &GitRepository, path: P) -> PathBuf {
     repo.gitdir().join(path)
 }
 
-pub(crate) fn repo_dir<P: AsRef<Path>>(repo: &GitRepository, path: P, mkdir: bool) -> Result<PathBuf, std::io::Error> {
+pub(crate) fn repo_dir<P: AsRef<Path>>(
+    repo: &GitRepository,
+    path: P,
+    mkdir: bool,
+) -> Result<PathBuf, std::io::Error> {
     let path = repo_path(repo, path);
 
     if path.exists() {
@@ -89,7 +91,11 @@ pub(crate) fn repo_dir<P: AsRef<Path>>(repo: &GitRepository, path: P, mkdir: boo
     }
 }
 
-pub(crate) fn repo_file<P: AsRef<Path>>(repo: &GitRepository, path: P, mkdir: bool) -> Result<PathBuf, std::io::Error> {
+pub(crate) fn repo_file<P: AsRef<Path>>(
+    repo: &GitRepository,
+    path: P,
+    mkdir: bool,
+) -> Result<PathBuf, std::io::Error> {
     let path = repo_path(repo, path);
     if path.is_file() {
         Ok(path)
@@ -102,7 +108,7 @@ pub(crate) fn repo_file<P: AsRef<Path>>(repo: &GitRepository, path: P, mkdir: bo
     } else {
         Err(std::io::Error::new(
             ErrorKind::NotFound,
-            format!("File does not exist in repo: {}",path.to_string_lossy()),
+            format!("File does not exist in repo: {}", path.to_string_lossy()),
         ))
     }
 }
@@ -126,9 +132,9 @@ fn find_repo_dir<P: Into<PathBuf>>(path: P) -> Result<PathBuf, GitError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use configparser::ini::Ini;
-    use std::path::{Path,PathBuf};
     use crate::lib::get_test_dir;
+    use configparser::ini::Ini;
+    use std::path::{Path, PathBuf};
 
     fn init_test_repo(temp_dir: &str) -> GitRepository {
         let worktree = get_test_dir(temp_dir);
@@ -141,7 +147,7 @@ mod tests {
     fn create_repo_path() {
         let test_repo = init_test_repo("create_repo_path");
         let rel_head: PathBuf = ["refs", "head"].iter().collect();
-        let head = repo_path(&test_repo,&rel_head);
+        let head = repo_path(&test_repo, &rel_head);
         let res_path = get_test_dir("create_repo_path")
             .join([".git", "refs", "head"].iter().collect::<PathBuf>());
         assert!(head == res_path, "was {}", head.to_string_lossy());
@@ -159,9 +165,7 @@ mod tests {
             std::fs::remove_dir_all(&res_dir).expect("unable to clean directory");
         }
         //test
-        let repo_dir = 
-             repo_dir(&test_repo,rel_path, true)
-            .expect("Error with repo_dir");
+        let repo_dir = repo_dir(&test_repo, rel_path, true).expect("Error with repo_dir");
 
         assert!(res_dir == repo_dir, "was {}", repo_dir.to_str().unwrap());
         assert!(res_dir.exists());
@@ -177,11 +181,10 @@ mod tests {
             std::fs::remove_file(&res_file).expect("unable to clean directory");
         }
 
-        let repo_file = repo_file(&test_repo, rel_path, true)
-            .expect(&format!(
-                "Error with repo_file at {}",
-                res_file.to_string_lossy()
-            ));
+        let repo_file = repo_file(&test_repo, rel_path, true).expect(&format!(
+            "Error with repo_file at {}",
+            res_file.to_string_lossy()
+        ));
         assert!(
             repo_file == res_file,
             "{} does not match {}",
@@ -190,8 +193,6 @@ mod tests {
         );
         assert!(repo_file.exists());
     }
-
-   
 
     #[test]
     fn find_repo_in_path() {

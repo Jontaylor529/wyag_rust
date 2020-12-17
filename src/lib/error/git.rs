@@ -17,9 +17,7 @@ impl std::fmt::Display for GitError {
             GitError::NotAGitDirectory() => write!(f, "Directory is not a git directory"),
             GitError::MissingConfig() => write!(f, "Config file not found"),
             GitError::UnsupportedVersion() => write!(f, "Unsupported repository version"),
-            GitError::AlreadyGitDirectory() => {
-                write!(f, "Path already contains a git directory")
-            }
+            GitError::AlreadyGitDirectory() => write!(f, "Path already contains a git directory"),
         }
     }
 }

@@ -1,6 +1,6 @@
-use std::path::PathBuf;
 use crate::lib::objects::git_repository::GitRepository;
 use configparser::ini::Ini;
+use std::path::PathBuf;
 use std::str::FromStr;
 
 #[derive(PartialEq)]
@@ -36,7 +36,7 @@ impl FromStr for ObjectType {
             "tree" => Ok(ObjectType::Tree),
             "blob" => Ok(ObjectType::Blob),
             "tag" => Ok(ObjectType::Tag),
-            _ => Err(InvalidObject{name: s.to_owned()}),
+            _ => Err(InvalidObject { name: s.to_owned() }),
         }
     }
 }
@@ -60,9 +60,7 @@ impl<'a> GitObject<'a> {
         Vec::<u8>::new()
     }
 
-    pub fn deserialize() -> () {
-
-    }
+    pub fn deserialize() -> () {}
 
     pub fn kind(&self) -> &ObjectType {
         &self.kind
@@ -71,6 +69,4 @@ impl<'a> GitObject<'a> {
     pub fn repo(&self) -> &GitRepository {
         self.repo
     }
-
 }
-

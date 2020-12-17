@@ -1,7 +1,6 @@
-use std::path::PathBuf;
-use configparser::ini::Ini;
 use crate::lib::error::git::GitError;
-
+use configparser::ini::Ini;
+use std::path::PathBuf;
 
 fn default_config() -> Ini {
     let mut config = Ini::new();
@@ -25,8 +24,8 @@ pub fn init<P: Into<PathBuf>>(path: P) -> Result<(), GitError> {
 }
 #[cfg(test)]
 mod tests {
-    use crate::lib::get_test_dir;
     use super::init;
+    use crate::lib::get_test_dir;
     #[test]
     fn create_default_repo() {
         let test_dir = get_test_dir("create_default_repo");
@@ -34,9 +33,7 @@ mod tests {
             std::fs::remove_dir_all(&test_dir.join(".git")).expect("Error cleaning directory");
         }
         match init(test_dir.to_str().unwrap()) {
-            Ok(_) => {
-                assert!(true)
-            }
+            Ok(_) => assert!(true),
             Err(err) => assert!(false, "Error initializing repo: {}", err),
         }
     }
