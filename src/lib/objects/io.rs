@@ -8,11 +8,18 @@ use sha1::{Digest, Sha1};
 use std::io::Read;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use crate::lib::error::git::GitError;
+use std::str::FromStr;
+use crate::lib::hash_array_to_string;
 
 struct ObjectData {
     length: String,
     obj_type: String,
     content: String,
+}
+
+pub enum GitNameFormat {
+    Placeholder,
 }
 
 fn decompress_file_to_bytes<P: AsRef<Path>>(path: P) -> Result<Vec<u8>, std::io::Error> {
@@ -64,7 +71,7 @@ fn validate_object<'a>(
     let obj_size: usize = data.length.parse()?;
     if obj_size == data.content.len() {
         if let Ok(obj_type) = data.obj_type.parse::<ObjectType>() {
-            Ok(GitObject::new(obj_type, data.content, repo))
+            Ok(GitObject::new(obj_type, data.content.as_bytes().to_owned(), repo))
         } else {
             Err(ObjectParseError::ObjectTypeNotRecognized(format!(
                 "{}",
@@ -88,6 +95,12 @@ pub fn read_object<'a>(
     validate_object(repo, data)
 }
 
+///Finds an object using the given name format and returns the full sha name
+pub(crate) fn find_object<'a>(repo: &GitRepository, name: &str, fmt: &GitNameFormat, follow: bool) -> Result<String,std::io::Error> {
+    Ok(String::default())
+}
+
+///Pack object info into the git object style
 fn format_object(object: &GitObject) -> Vec<u8> {
     let data = object.serialize();
     let type_string = object.kind().to_string();
@@ -100,6 +113,19 @@ fn format_object(object: &GitObject) -> Vec<u8> {
     result
 }
 
+pub(crate) fn hash_file(file: &str, fmt: &str, repo: Option<GitRepository>) -> Result<Vec<u8>, GitError> {
+    let write = repo.is_some();
+    let fmt = ObjectType::from_str(fmt)?;
+    let content = std::fs::read(file)?;
+    let repo = repo.unwrap_or_default();
+    let object = GitObject::new(fmt, content, &repo);
+    if write {
+        write_object(&object)?;
+    }
+    Ok(hash_object(&object))
+}
+
+
 fn hash_object(object: &GitObject) -> Vec<u8> {
     let result = format_object(object);
     let mut hasher = Sha1::new();
@@ -109,11 +135,7 @@ fn hash_object(object: &GitObject) -> Vec<u8> {
 
 fn write_object(object: &GitObject) -> Result<(), std::io::Error> {
     let hash = hash_object(object);
-    let hash_iter = hash.iter().map(|v| format!("{:x}", v));
-    let mut hash_str = "".to_owned();
-    for val in hash_iter {
-        hash_str.push_str(val.as_ref());
-    }
+    let hash_str = hash_array_to_string(&hash);
     let path = PathBuf::new()
         .join("objects")
         .join(&hash_str[..2])
@@ -185,10 +207,11 @@ mod tests {
             PathBuf::new(),
             configparser::ini::Ini::new(),
         );
-        let test_obj = GitObject::new(ObjectType::Blob, "Not real content".to_owned(), &test_repo);
+        let test_obj = GitObject::new(ObjectType::Blob, "Not real content".as_bytes().to_owned(), &test_repo);
         let hash = hash_object(&test_obj);
         let hash_str: String = format!("{:x?}", &hash);
-        assert!(hash_str == "[cc, d4, e8, f9, 5c, f9, 1b, 38, da, 8b, 25, ba, 2d, 77, bc, 74, c2, a8, 81, d9]", "Hash was {}", hash_str);
+        println!("object content is {}", String::from_utf8_lossy(test_obj.content()));
+        assert!(hash_str == "[44, 94, 95, 3d, 94, 7a, dd, 7f, 87, c6, 52, ad, 6b, df, 72, 43, cc, 94, 50, 41]", "Hash was {}", hash_str);
     }
 
     #[test]
@@ -197,14 +220,14 @@ mod tests {
         let test_file = test_dir
             .join(".git")
             .join("objects")
-            .join("cc")
-            .join("d4e8f95cf91b38da8b25ba2d77bc74c2a881d9");
+            .join("44")
+            .join("94953d947add7f87c652ad6bdf7243cc945041");
         let test_repo = GitRepository::new(
             PathBuf::new(),
             test_dir.join(".git"),
             configparser::ini::Ini::new(),
         );
-        let test_obj = GitObject::new(ObjectType::Blob, "Not real content".to_owned(), &test_repo);
+        let test_obj = GitObject::new(ObjectType::Blob, "Not real content".as_bytes().to_owned(), &test_repo);
 
         if !test_dir.exists() {
             std::fs::create_dir_all(&test_dir).expect("Unable to create test directory");

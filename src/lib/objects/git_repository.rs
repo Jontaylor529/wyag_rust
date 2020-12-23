@@ -3,7 +3,9 @@ use crate::lib::error::git::GitError;
 use configparser::ini::Ini;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
+use std::default::Default;
 
+#[derive(Default)]
 pub struct GitRepository {
     worktree: PathBuf,
     gitdir: PathBuf,
@@ -113,7 +115,8 @@ pub(crate) fn repo_file<P: AsRef<Path>>(
     }
 }
 
-fn find_repo_dir<P: Into<PathBuf>>(path: P) -> Result<PathBuf, GitError> {
+///Return the path of the folder containing the .git along the given path
+pub(crate) fn find_repo_dir<P: Into<PathBuf>>(path: P) -> Result<PathBuf, GitError> {
     let path = path.into().canonicalize()?;
     let path = clean_unc(path);
     let git_dir = path.join(".git");

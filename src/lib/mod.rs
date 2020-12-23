@@ -19,3 +19,12 @@ fn clean_unc(path: PathBuf) -> PathBuf {
 fn get_test_dir(sub_dir: &str) -> PathBuf {
     std::env::temp_dir().join("testing").join(sub_dir)
 }
+
+fn hash_array_to_string(arr: &[u8]) -> String {
+    let hash_iter = arr.iter().map(|v| format!("{:x}", v));
+    let mut hash_str = "".to_owned();
+    for val in hash_iter {
+        hash_str.push_str(val.as_ref());
+    }
+    hash_str
+}

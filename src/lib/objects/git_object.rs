@@ -2,6 +2,7 @@ use crate::lib::objects::git_repository::GitRepository;
 use configparser::ini::Ini;
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::fmt::Formatter;
 
 #[derive(PartialEq)]
 pub enum ObjectType {
@@ -27,6 +28,12 @@ pub struct InvalidObject {
     name: String,
 }
 
+impl std::fmt::Display for InvalidObject {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f,"Invalid type name: {}",self.name)
+    }
+}
+
 impl FromStr for ObjectType {
     type Err = InvalidObject;
 
@@ -43,12 +50,12 @@ impl FromStr for ObjectType {
 
 pub struct GitObject<'a> {
     kind: ObjectType,
-    content: String,
+    content: Vec<u8>,
     repo: &'a GitRepository,
 }
 
 impl<'a> GitObject<'a> {
-    pub fn new(kind: ObjectType, content: String, repo: &'a GitRepository) -> GitObject {
+    pub fn new(kind: ObjectType, content: Vec<u8>, repo: &'a GitRepository) -> GitObject {
         GitObject {
             kind,
             content,
@@ -56,11 +63,27 @@ impl<'a> GitObject<'a> {
         }
     }
 
-    pub fn serialize(&self) -> Vec<u8> {
-        Vec::<u8>::new()
+    pub fn serialize(&self) -> &[u8] {
+        match self.kind {
+            ObjectType::Blob => {
+                &self.content },
+            _ => {
+                panic!("Placeholder until I have all implementations done")
+            }
+        }
+        
     }
 
-    pub fn deserialize() -> () {}
+    pub fn deserialize(&mut self, data: Vec<u8>) -> () {
+        match self.kind {
+            ObjectType::Blob => {
+                self.content = data;
+            },
+            _ => {
+                panic!("Placeholder until I have all implementations done")
+            }
+        }
+    }
 
     pub fn kind(&self) -> &ObjectType {
         &self.kind
@@ -68,5 +91,9 @@ impl<'a> GitObject<'a> {
 
     pub fn repo(&self) -> &GitRepository {
         self.repo
+    }
+
+    pub fn content(&self) -> &[u8] {
+        &self.content
     }
 }

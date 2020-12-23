@@ -1,9 +1,9 @@
 pub mod lib;
 use clap::{App, Arg};
-use lib::commands::init;
+use lib::commands::{init,cat_file};
 
 fn make_parser() -> App<'static, 'static> {
-    App::new("wyag")
+     App::new("wyag")
         .version("0.1")
         .author("Jonathan Taylor")
         .about("Learner's git implementation (not fully featured)")
@@ -17,6 +17,21 @@ fn make_parser() -> App<'static, 'static> {
                     .required(true),
             ),
         )
+        .subcommand(
+            App::new("cat-file").arg(
+            Arg::with_name("type")
+            .index(1)
+            .value_name("TYPE")
+            .help("Specify the type")
+            .required(true)
+            .possible_values(&["blob", "commit","tag", "tree"])
+        ).arg(
+            Arg::with_name("object")
+            .index(2)
+            .value_name("OBJECT")
+            .help("The object to display")
+            .required(true)
+        ))
 }
 
 fn main() {
@@ -31,8 +46,21 @@ fn main() {
         } else {
             println!("No value given for path")
         }
-    } else {
-        println!("not  a valid command")
+    } else if matches.is_present("cat-file"){
+        let sub_matches = matches.subcommand_matches("cat-file").unwrap();
+        if let Some(type_str) = sub_matches.value_of("type") {
+            if let Some(object) = sub_matches.value_of("object") {
+                //TODO handle unwrap here better
+                match cat_file(std::env::current_dir().unwrap(), type_str, object) {
+                    Ok(_) => (),
+                    Err(err) => println!("Error: {}", err),
+                }
+            } else {
+                println!("No value given for object");
+            }
+        } else {
+            println!("No value given for type");
+        }
     }
 }
 
