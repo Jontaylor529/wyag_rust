@@ -1,10 +1,9 @@
-use flate2::read::ZlibDecoder;
-use std::io::Read;
-use std::path::{Path, PathBuf};
+
+use std::path::{PathBuf};
 
 pub mod commands;
-pub mod error;
-pub mod objects;
+pub(crate) mod objects;
+pub(crate) mod parsing;
 
 fn clean_unc(path: PathBuf) -> PathBuf {
     let str_path = path.to_string_lossy();
@@ -20,11 +19,4 @@ fn get_test_dir(sub_dir: &str) -> PathBuf {
     std::env::temp_dir().join("testing").join(sub_dir)
 }
 
-fn hash_array_to_string(arr: &[u8]) -> String {
-    let hash_iter = arr.iter().map(|v| format!("{:x}", v));
-    let mut hash_str = "".to_owned();
-    for val in hash_iter {
-        hash_str.push_str(val.as_ref());
-    }
-    hash_str
-}
+

@@ -41,7 +41,7 @@ fn main() {
         if let Some(path) = sub_matches.value_of("path") {
             match init(path) {
                 Ok(_) => (),
-                Err(err) => println!("Error initializing: {}", err),
+                Err(err) => println!("Error initializing: {:?}", err),
             }
         } else {
             println!("No value given for path")
@@ -53,7 +53,7 @@ fn main() {
                 //TODO handle unwrap here better
                 match cat_file(std::env::current_dir().unwrap(), type_str, object) {
                     Ok(_) => (),
-                    Err(err) => println!("Error: {}", err),
+                    Err(err) => println!("Error: {:?}", err),
                 }
             } else {
                 println!("No value given for object");

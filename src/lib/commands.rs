@@ -1,10 +1,28 @@
-use crate::lib::error::git::GitError;
 use configparser::ini::Ini;
 use std::path::PathBuf;
 use crate::lib::objects::git_repository::*;
-use crate::lib::objects::io::{read_object,find_object,GitNameFormat,hash_file};
+use crate::lib::objects::git_object::{GitObject,ObjectError};
+use crate::lib::parsing::decoding::{GitNameFormat};
+use std::rc::Rc;
 
-use super::{hash_array_to_string, objects::git_object::ObjectType};
+#[derive(Debug)]
+pub enum CommandError {
+    Init(String),
+    Repo(RepositoryError),
+    Object(ObjectError),
+}
+
+impl From<RepositoryError> for CommandError {
+    fn from(repo_err: RepositoryError) -> Self {
+        CommandError::Repo(repo_err)
+    }
+}
+
+impl From<ObjectError> for CommandError {
+    fn from(obj_err: ObjectError) -> Self {
+        CommandError::Object(obj_err)
+    } 
+}
 
 fn default_config() -> Ini {
     let mut config = Ini::new();
@@ -14,45 +32,34 @@ fn default_config() -> Ini {
     config
 }
 
-pub fn init<P: Into<PathBuf>>(path: P) -> Result<(), GitError> {
+pub fn init<P: Into<PathBuf>>(path: P) -> Result<(), CommandError> {
     let path: PathBuf = path.into();
     let git_dir = path.join(".git");
     if git_dir.exists() {
-        Err(GitError::AlreadyGitDirectory())
+        Err(CommandError::Init("Already a git directory".to_owned()))
     } else {
-        std::fs::create_dir_all(&git_dir)?;
+        std::fs::create_dir_all(&git_dir).or(Err(CommandError::Init("Cannot create .git dirctory".to_owned())));
         let config = default_config();
-        config.write(git_dir.join("config").to_str().unwrap())?;
+        config.write(git_dir.join("config").to_str().unwrap());
         Ok(())
     }
 }
 
-pub fn cat_file<P: Into<PathBuf>>(git_dir_path: P, type_str: &str, target: &str) -> Result<(), GitError> {
-    let git_dir_path = find_repo_dir(git_dir_path)?;
-    let repo = GitRepository::at_path(git_dir_path, false)?;
-    let hash = find_object(&repo,target,&GitNameFormat::Placeholder,true)?;
-    let object = read_object(&repo, &hash).or(Err(GitError::Parse()))?;
+pub fn cat_file<P: Into<PathBuf>>(git_dir_path: P, type_str: &str, target: &str) -> Result<(), CommandError> {
+    let repo = GitRepository::along_path(git_dir_path.into(), false)?;
+    let repo = Rc::new(repo);
+    let object = GitObject::from_internal_name(&repo, target, &GitNameFormat::Placeholder,true)?;
     println!("{}",String::from_utf8_lossy(object.serialize()));
     Ok(())
 }
 
-pub fn hash_object_cmd(object_type: &str, file: &str, write: bool) -> Result<(),GitError> {
-    let repo: Option<GitRepository> = None;
+///Creates hash for the given file and possibly adds it to a repo
+pub fn hash_object(object_type: &str, file: &str, repo: &Rc<GitRepository>, write:bool) -> Result<(), CommandError> {
+    let blob = GitObject::from_external_file(file, repo)?;
     if write {
-        let repo = Some(
-            GitRepository::at_path(
-                find_repo_dir(
-                    std::env::current_dir()?
-                )?, false)?
-            );
+        blob.write_to_repo()?;
     }
-    hash_object(object_type, file, repo)
-}
-
-///Creates hash for the given file and adds it to a repo, if one is given
-pub fn hash_object(object_type: &str, file: &str, repo: Option<GitRepository>) -> Result<(), GitError> {
-    let hash = hash_file(file, object_type, repo)?;
-    println!("{}", hash_array_to_string(&hash));
+    println!("{}", blob.get_hash());
     Ok(())
 }
 
@@ -61,6 +68,7 @@ mod tests {
     use super::{hash_object, init};
     use crate::lib::get_test_dir;
     use crate::lib::objects::git_repository::GitRepository;
+    use std::rc::Rc;
     #[test]
     fn create_default_repo() {
         let test_dir = get_test_dir("create_default_repo");
@@ -69,7 +77,7 @@ mod tests {
         }
         match init(test_dir.to_str().unwrap()) {
             Ok(_) => assert!(true),
-            Err(err) => assert!(false, "Error initializing repo: {}", err),
+            Err(err) => assert!(false, "Error initializing repo: {:?}", err),
         }
     }
 
@@ -84,10 +92,10 @@ mod tests {
             .join(r"src\test\blob_test.txt");
 
         init(&test_dir).expect("unable to create git dir at test dir");
-        let repo = GitRepository::at_path( &test_dir, false).expect("Error opening repo");
-        match hash_object("blob", test_file.to_str().unwrap(), Some(repo)) {
+        let repo = Rc::new(GitRepository::at_path( &test_dir, false).expect("Error opening repo"));
+        match hash_object("blob", test_file.to_str().unwrap(), &repo,false) {
             Ok(_) => assert!(true),
-            Err(err) => assert!(false, "Error hashing object: {}",err),
+            Err(err) => assert!(false, "Error hashing object: {:?}",err),
         }
     }
 }

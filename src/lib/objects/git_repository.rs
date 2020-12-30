@@ -1,15 +1,48 @@
 use crate::lib::clean_unc;
-use crate::lib::error::git::GitError;
 use configparser::ini::Ini;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::default::Default;
+use std::fmt::{Display,Formatter};
+use std::convert::From;
 
 #[derive(Default)]
 pub struct GitRepository {
     worktree: PathBuf,
     gitdir: PathBuf,
     config: Ini,
+}
+
+#[derive(Debug)]
+pub enum RepositoryError {
+    FailedToCreateDirctory(std::io::Error),
+    DirectoryDoesNotExist(String),
+    NoGitDirectory(),
+    ConfigLoadFail(String),
+    MissingConfig(),
+    UnsupportedVersion(i64),
+    VersionNotFound(),
+}
+
+impl From<std::io::Error> for RepositoryError {
+    fn from(io_err: std::io::Error) -> Self {
+        RepositoryError::FailedToCreateDirctory(io_err)
+    }
+}
+
+impl Display for RepositoryError {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            RepositoryError::FailedToCreateDirctory(io_err) => {write!(f,"failed to create directory: {}", io_err)},
+            RepositoryError::DirectoryDoesNotExist(path) => {write!(f,"Directory does not exist at:{}", path)},
+            RepositoryError::NoGitDirectory() => {write!(f, "Git directory not found")},
+            RepositoryError::ConfigLoadFail(msg) => {write!(f, "Failed to load config: {}",msg)},
+            RepositoryError::MissingConfig() => {write!(f, "Config file not found")},
+            RepositoryError::UnsupportedVersion(num) => {write!(f, "Unsuppored version: {}, only 1.0 supported", num)},
+            RepositoryError::VersionNotFound() => {write!(f, "Unable to find key for repository version in config")},
+
+        }
+    }
 }
 
 impl GitRepository {
@@ -33,31 +66,31 @@ impl GitRepository {
         &self.config
     }
 
-    pub fn at_path<P: Into<PathBuf>>(path: P, force: bool) -> Result<GitRepository, GitError> {
+    pub fn at_path<P: Into<PathBuf>>(path: P, force: bool) -> Result<GitRepository, RepositoryError> {
         let worktree: PathBuf = path.into();
         let gitdir = worktree.join(".git");
         let mut config = Ini::new();
         let config_path = gitdir.join("config");
 
         if !force && !gitdir.exists() {
-            return Err(GitError::NotAGitDirectory());
+            return Err(RepositoryError::NoGitDirectory());
         }
 
         if config_path.is_file() {
-            if config.load(config_path.to_str().unwrap()).is_err() {
-                return Err(GitError::Parse());
+            if let Err(msg) = config.load(config_path.to_str().unwrap()) {
+                return Err(RepositoryError::ConfigLoadFail(msg));
             }
         } else if !force {
-            return Err(GitError::MissingConfig());
+            return Err(RepositoryError::MissingConfig());
         }
 
         if !force {
             if let Ok(Some(ver)) = config.getint("core", "repositoryformatversion") {
                 if ver != 0 {
-                    return Err(GitError::UnsupportedVersion());
+                    return Err(RepositoryError::UnsupportedVersion(ver));
                 }
             } else {
-                return Err(GitError::Parse());
+                return Err(RepositoryError::VersionNotFound());
             }
         }
 
@@ -67,6 +100,13 @@ impl GitRepository {
             config,
         })
     }
+
+    ///Returns a repo object pointing to a .git folder found anywhere along the given path
+    pub fn along_path<P: AsRef<Path>>(path: P, force: bool) -> Result<GitRepository, RepositoryError>{
+        let git_dir_folder = find_repo_dir(path.as_ref())?;
+        GitRepository::at_path(git_dir_folder, force)
+    }
+
 } //impl GitRepo
 
 pub(crate) fn repo_path<P: AsRef<Path>>(repo: &GitRepository, path: P) -> PathBuf {
@@ -116,7 +156,7 @@ pub(crate) fn repo_file<P: AsRef<Path>>(
 }
 
 ///Return the path of the folder containing the .git along the given path
-pub(crate) fn find_repo_dir<P: Into<PathBuf>>(path: P) -> Result<PathBuf, GitError> {
+fn find_repo_dir<P: Into<PathBuf>>(path: P) -> Result<PathBuf, RepositoryError> {
     let path = path.into().canonicalize()?;
     let path = clean_unc(path);
     let git_dir = path.join(".git");
@@ -127,7 +167,7 @@ pub(crate) fn find_repo_dir<P: Into<PathBuf>>(path: P) -> Result<PathBuf, GitErr
         if let Some(parent) = path.parent() {
             find_repo_dir(parent.to_str().unwrap())
         } else {
-            Err(GitError::NotAGitDirectory())
+            Err(RepositoryError::NoGitDirectory())
         }
     }
 }
