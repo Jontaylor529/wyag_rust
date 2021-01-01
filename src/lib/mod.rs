@@ -4,6 +4,7 @@ use std::path::{PathBuf};
 pub mod commands;
 pub(crate) mod objects;
 pub(crate) mod parsing;
+pub(crate) mod sorted_dict;
 
 fn clean_unc(path: PathBuf) -> PathBuf {
     let str_path = path.to_string_lossy();
